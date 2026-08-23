@@ -1,4 +1,4 @@
-# 1. Project Objective
+# 1. Objective
 Build an AI agent-based knowledge and decision support system that:
 1. Accepts documents in PDF, TXT, CSV, and Excel formats.
 2. Extracts and normalizes their content.
@@ -12,7 +12,7 @@ Build an AI agent-based knowledge and decision support system that:
 10. Runs reproducibly in Docker.
 11. Includes automated tests and project documentation.
 
-# 2. Project Process Flow
+# 2. Process Flow
 Followin are list of Key activities involved:
     Documents 
     Ingestion -> Parsing -> Normalization -> Chunking
@@ -23,7 +23,6 @@ Followin are list of Key activities involved:
 
 
 ## 3. Idea- Procurement / Vendor Evaluation Assistant
-
 **Problem:** 
 Procurement teams need to compare vendors using contracts, proposals, pricing sheets, and requirements.
 
@@ -45,8 +44,7 @@ Procurement teams need to compare vendors using contracts, proposals, pricing sh
 - Comparison/Reasoning Agent
 - Validation Agent
 
-
-# 4. Reference Architecture
+# 4. Architecture
 
                          +----------------------+
                          |      User / UI       |
@@ -90,3 +88,31 @@ Procurement teams need to compare vendors using contracts, proposals, pricing sh
                          | Grounded Response    |
                          | + Source Citations   |
                          +----------------------+
+
+
+## 5. Tech Stack
+
+- Python 3.11
+- FastAPI
+- Qdrant
+- OpenAI-compatible LLM/embedding APIs
+- PyMuPDF
+- pandas/openpyxl
+- Pydantic
+- pytest
+- Docker Compose
+
+## 6. Run
+
+# Run from bash shell
+cp .env.example .env
+
+# configure LLM_MODEL, LLM_API_KEY, EMBEDDING_MODEL, EMBEDDING_API_KEY
+docker compose up --build
+API: http://localhost:8000/docs
+
+# Run from bash shell to Upload:
+curl -X POST http://localhost:8000/documents -F "file=@data/sample/acme_proposal.txt"
+
+# Run Test from bash shell
+curl -X POST http://localhost:8000/chat   -H "Content-Type: application/json"   -d '{"question":"Which vendor satisfies all mandatory requirements?"}'

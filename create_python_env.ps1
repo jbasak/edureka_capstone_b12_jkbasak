@@ -29,3 +29,4 @@ if (Test-Path $reqFile) {
 # 4. Activate the environment for the current session
 Write-Host "Activating Python environment..." -ForegroundColor Cyan
 & "$envPath\Scripts\Activate.ps1"
+cd C:\BASAK\Codebase\github_repos\edureka_capstone_b12_jkbasak

@@ -1,4 +1,5 @@
-**1. Objective**
+# 1. Objective
+
 Build an AI agent-based knowledge and decision support system that:
 1. Accepts documents in PDF, TXT, CSV, and Excel formats.
 2. Extracts and normalizes their content.
@@ -22,7 +23,8 @@ Followin are list of Key activities involved:
     Final Response
 
 
-## 3. Idea- Procurement / Vendor Evaluation Assistant
+# 3. Idea- Procurement / Vendor Evaluation 
+## Assistant
 **Problem:** 
 Procurement teams need to compare vendors using contracts, proposals, pricing sheets, and requirements.
 
@@ -102,17 +104,17 @@ Procurement teams need to compare vendors using contracts, proposals, pricing sh
 - pytest
 - Docker Compose
 
-## 6. Run
+# 6. Run
 
-# Run from bash shell
+## Run from bash shell
 cp .env.example .env
 
-# configure LLM_MODEL, LLM_API_KEY, EMBEDDING_MODEL, EMBEDDING_API_KEY
+## Configure LLM_MODEL, LLM_API_KEY, EMBEDDING_MODEL, EMBEDDING_API_KEY
 docker compose up --build
 API: http://localhost:8000/docs
 
-# Run from bash shell to Upload:
+## Run from bash shell to Upload:
 curl -X POST http://localhost:8000/documents -F "file=@data/sample/acme_proposal.txt"
 
-# Run Test from bash shell
+## Run Test from bash shell
 curl -X POST http://localhost:8000/chat   -H "Content-Type: application/json"   -d '{"question":"Which vendor satisfies all mandatory requirements?"}'

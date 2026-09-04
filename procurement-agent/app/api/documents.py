@@ -7,7 +7,7 @@ GET  /documents  — list all indexed source files with chunk counts
 
 Full ingestion pipeline per upload:
   UploadFile → parse_document() → chunk_parsed_document()
-             → embed_texts()    → qdrant.upsert_chunks()
+             → embed_texts()    → chroma.upsert_chunks()
              → DocumentUploadResponse (201)
 """
 
@@ -22,7 +22,7 @@ from app.config import get_settings
 from app.ingestion.parser import parse_document, SUPPORTED_EXTENSIONS
 from app.ingestion.chunker import chunk_parsed_document
 from app.ingestion.embedder import embed_texts
-from app.vector_store.qdrant_client import get_qdrant_manager
+from app.vector_store.chroma_client import get_chroma_manager
 from app.schemas.document import DocumentUploadResponse, DeleteDocumentResponse
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ _MAX_BYTES = settings.max_upload_mb * 1024 * 1024  # MB → bytes
     summary="Ingest a document",
     description=(
         "Upload a PDF, TXT, CSV, XLSX, or DOCX file. The document is parsed, "
-        "chunked, embedded, and stored in Qdrant. Re-uploading the same file "
+        "chunked, embedded, and stored in ChromaDB. Re-uploading the same file "
         "is idempotent — existing vectors are overwritten."
     ),
 )
@@ -141,11 +141,11 @@ async def ingest_document(
             detail=f"Embedding failed: {exc}",
         )
 
-    qdrant = get_qdrant_manager()
+    chroma = get_chroma_manager()
     try:
-        stored = qdrant.upsert_chunks(chunks=chunks, vectors=vectors)
+        stored = chroma.upsert_chunks(chunks=chunks, vectors=vectors)
     except Exception as exc:
-        logger.exception("Qdrant upsert failed for '%s'", filename)
+        logger.exception("ChromaDB upsert failed for '%s'", filename)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Vector store write failed: {exc}",
@@ -161,7 +161,7 @@ async def ingest_document(
         vendor_name=vendor_name,
         doc_category=doc_category,
         chunks_stored=stored,
-        collection=settings.qdrant_collection,
+        collection=settings.chroma_collection,
     )
 
 
@@ -171,12 +171,12 @@ async def ingest_document(
     "/{filename:path}",
     response_model=DeleteDocumentResponse,
     summary="Remove a document from the index",
-    description="Delete all vector points associated with the given source filename.",
+    description="Delete all vector chunks associated with the given source filename.",
 )
 def delete_document(filename: str) -> DeleteDocumentResponse:
-    qdrant = get_qdrant_manager()
+    chroma = get_chroma_manager()
     try:
-        qdrant.delete_by_source(filename)
+        chroma.delete_by_source(filename)
     except Exception as exc:
         logger.exception("Delete failed for '%s'", filename)
         raise HTTPException(
@@ -199,38 +199,13 @@ def delete_document(filename: str) -> DeleteDocumentResponse:
 )
 def list_documents() -> dict:
     """
-    Scroll the entire Qdrant collection and aggregate unique source_file values
-    with their chunk counts.  Practical for collections up to ~100 k points.
+    Uses ChromaManager.list_sources() which retrieves all metadata in one call
+    and aggregates unique source_file values with chunk counts.
     """
-    qdrant = get_qdrant_manager()
+    chroma = get_chroma_manager()
     try:
-        from qdrant_client.http import models as qmodels
-
-        source_counts: dict[str, int] = {}
-        offset = None
-
-        while True:
-            result, next_offset = qdrant._client.scroll(
-                collection_name=settings.qdrant_collection,
-                limit=256,
-                offset=offset,
-                with_payload=["source_file", "vendor_name"],
-                with_vectors=False,
-            )
-            for point in result:
-                src = (point.payload or {}).get("source_file", "unknown")
-                source_counts[src] = source_counts.get(src, 0) + 1
-
-            if next_offset is None:
-                break
-            offset = next_offset
-
-        documents = [
-            {"source_file": src, "chunks": count, "vendor_name": None}
-            for src, count in sorted(source_counts.items())
-        ]
+        documents = chroma.list_sources()
         return {"total_documents": len(documents), "documents": documents}
-
     except Exception as exc:
         logger.exception("Failed to list documents")
         raise HTTPException(

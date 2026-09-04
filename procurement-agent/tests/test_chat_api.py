@@ -4,7 +4,7 @@ tests/test_chat_api.py
 Integration tests for POST /chat and POST /chat/compliance.
 
 The session-scoped TestClient (conftest.py) patches:
-  - Qdrant → InMemoryQdrantManager (pre-populated via helper)
+  - ChromaDB → in-memory EphemeralClient (pre-populated via helper)
   - embed_query → zero-vector
   - openai.OpenAI → canned LLM response with citations
 
@@ -208,15 +208,22 @@ class TestCitations:
 class TestHallucinationGuard:
     def test_empty_db_returns_sentinel(self):
         """
-        With a fresh empty in-memory store (no ingested docs), the retrieval
-        agent returns 0 chunks and the controller short-circuits to the sentinel.
+        With a fresh empty in-memory Chroma store (no ingested docs), the
+        retrieval agent returns 0 chunks and the controller short-circuits
+        to the sentinel string.
         """
-        from tests.conftest import InMemoryQdrantManager
-        from app.vector_store import qdrant_client as qc_module
+        import chromadb as _chromadb
+        from app.vector_store.chroma_client import ChromaManager
+        from app.vector_store import chroma_client as cc_module
 
-        empty_store = InMemoryQdrantManager()
-        original = qc_module.get_qdrant_manager
-        qc_module.get_qdrant_manager = lambda: empty_store  # type: ignore[assignment]
+        empty_client = _chromadb.EphemeralClient(
+            settings=_chromadb.config.Settings(anonymized_telemetry=False)
+        )
+        empty_manager = ChromaManager(client=empty_client)
+        empty_manager.ensure_collection()
+
+        original = cc_module.get_chroma_manager
+        cc_module.get_chroma_manager = lambda: empty_manager  # type: ignore[assignment]
 
         try:
             with patch("app.agents.retrieval.embed_query", return_value=[0.0] * 384):
@@ -228,7 +235,7 @@ class TestHallucinationGuard:
                         json={"question": "Who offers the cheapest option?"},
                     )
         finally:
-            qc_module.get_qdrant_manager = original  # type: ignore[assignment]
+            cc_module.get_chroma_manager = original  # type: ignore[assignment]
 
         data = response.json()
         assert data["answer"] == "Information not found in context."

@@ -54,7 +54,7 @@ _COMPARATIVE_KEYWORDS = re.compile(
 class AgentController:
     """
     Top-level orchestrator.  Instantiates agents on construction so they
-    share the same LLM client and Qdrant connection for the request lifetime.
+    share the same LLM client and ChromaDB connection for the request lifetime.
     """
 
     def __init__(

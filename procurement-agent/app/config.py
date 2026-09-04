@@ -25,10 +25,11 @@ class Settings(BaseSettings):
     # ── Retrieval ────────────────────────────────────────────────────────────
     top_k: int = 6
 
-    # ── Qdrant ───────────────────────────────────────────────────────────────
-    qdrant_host: str = "localhost"
-    qdrant_port: int = 6333
-    qdrant_collection: str = "procurement_docs"
+    # ── ChromaDB ─────────────────────────────────────────────────────────────
+    # persist_dir: local directory where ChromaDB stores its data files.
+    # Use ":memory:" in tests (handled directly in conftest via EphemeralClient).
+    chroma_persist_dir: str = "./chroma_db"
+    chroma_collection: str = "procurement_docs"
 
     # ── Upload limits ────────────────────────────────────────────────────────
     max_upload_mb: int = 25

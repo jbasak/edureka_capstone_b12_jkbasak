@@ -16,8 +16,8 @@ torch==2.3.0
 # CPU-only torch — comment out if GPU is available
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-# ── Vector database ───────────────────────────────────────────────────────────
-qdrant-client==1.9.1
+# ── Vector database (ChromaDB — pure Python, no separate server needed) ───────
+chromadb==0.5.3
 
 # ── Document parsing ──────────────────────────────────────────────────────────
 pymupdf==1.24.3

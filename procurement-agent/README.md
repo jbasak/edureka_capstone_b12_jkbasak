@@ -45,8 +45,8 @@ User / curl / UI
          │                 │
          ▼                 ▼
   ┌──────────────┐  ┌──────────────┐
-  │  Qdrant      │  │  Groq LLM    │
-  │  Vector DB   │  │  (llama-3.3) │
+  │  ChromaDB    │  │  Groq LLM    │
+  │ (in-process) │  │  (llama-3.3) │
   └──────────────┘  └──────────────┘
 ```
 
@@ -66,8 +66,9 @@ User / curl / UI
 
 ### Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) ≥ 24
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) ≥ 24 (optional — see local run below)
 - A [Groq API key](https://console.groq.com/) (free tier available)
+- Python 3.11+ (for local run without Docker)
 
 ### 1. Clone and configure
 
@@ -87,14 +88,40 @@ docker compose up --build
 ```
 
 On first start, Docker will:
-- Pull the `qdrant/qdrant:v1.9.2` image
 - Build the FastAPI image (`python:3.11-slim`)
 - Download the `all-MiniLM-L6-v2` embedding model (~90 MB, cached in a named volume)
+- Create the ChromaDB persist directory inside the `chroma_data` volume
+
+> **No Qdrant, no Redis, no external services** — ChromaDB runs embedded inside
+> the FastAPI process and persists data to a Docker volume.
 
 The API is ready when you see:
 ```
 procurement_api  | INFO:     Application startup complete.
 ```
+
+### 2b. Run locally without Docker
+
+```powershell
+# 1. Create and activate a virtual environment
+cd procurement-agent
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# 2. Install dependencies (ChromaDB is pure Python — no server needed)
+pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env: set GROQ_API_KEY=gsk_...
+# CHROMA_PERSIST_DIR=./chroma_db  (already set — data stored locally)
+
+# 4. Start the API
+uvicorn app.main:app --reload --port 8000
+```
+
+ChromaDB will create the `./chroma_db` directory automatically on first run.
 
 ### 3. Open the interactive docs
 
@@ -116,9 +143,8 @@ All settings are driven by the `.env` file.
 | `CHUNK_SIZE` | `900` | Max tokens per chunk |
 | `CHUNK_OVERLAP` | `150` | Overlap tokens between chunks (~17%) |
 | `TOP_K` | `6` | Chunks retrieved per query |
-| `QDRANT_HOST` | `qdrant` | Qdrant hostname (use `localhost` outside Docker) |
-| `QDRANT_PORT` | `6333` | Qdrant REST port |
-| `QDRANT_COLLECTION` | `procurement_docs` | Vector collection name |
+| `CHROMA_PERSIST_DIR` | `./chroma_db` | Directory where ChromaDB persists data |
+| `CHROMA_COLLECTION` | `procurement_docs` | ChromaDB collection name |
 | `MAX_UPLOAD_MB` | `25` | Maximum upload file size |
 | `LOG_LEVEL` | `INFO` | Python logging level |
 
@@ -128,7 +154,7 @@ All settings are driven by the `.env` file.
 
 ### `POST /documents` — Ingest a document
 
-Upload a document to parse, chunk, embed, and store in Qdrant.
+Upload a document to parse, chunk, embed, and store in ChromaDB.
 
 **Supported formats:** `.pdf` `.txt` `.csv` `.xlsx` `.docx`
 
@@ -282,8 +308,10 @@ curl http://localhost:8000/health
 ```json
 {
   "status": "healthy",
-  "qdrant": "connected",
+  "vector_db": "connected",
+  "vector_db_type": "chromadb",
   "collection": "procurement_docs",
+  "persist_dir": "./chroma_db",
   "vector_count": 312,
   "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
   "llm_model": "llama-3.3-70b-versatile"
@@ -363,7 +391,7 @@ procurement-agent/
 │   ├── agents/
 │   │   ├── controller.py         # Agent Controller — full pipeline orchestration
 │   │   ├── extractor.py          # Requirement Extraction Agent
-│   │   ├── retrieval.py          # Retrieval Agent (Qdrant + embeddings)
+│   │   ├── retrieval.py          # Retrieval Agent (ChromaDB + embeddings)
 │   │   ├── reasoning.py          # Reasoning Agent (Groq LLM)
 │   │   └── validator.py          # Validation Agent (citation checker)
 │   │
@@ -373,14 +401,14 @@ procurement-agent/
 │   │   └── embedder.py           # HuggingFace sentence-transformers wrapper
 │   │
 │   ├── vector_store/
-│   │   └── qdrant_client.py      # Qdrant collection management + upsert/search
+│   │   └── chroma_client.py      # ChromaDB collection management + upsert/search
 │   │
 │   └── schemas/
 │       ├── document.py           # Ingestion request/response models
 │       └── chat.py               # Chat request/response models
 │
 ├── tests/
-│   ├── conftest.py               # Fixtures: in-memory Qdrant, mocked LLM, TestClient
+│   ├── conftest.py               # Fixtures: in-memory ChromaDB EphemeralClient, mocked LLM, TestClient
 │   ├── test_parser.py            # Parser unit tests (18 tests)
 │   ├── test_chunker.py           # Chunker unit tests (14 tests)
 │   ├── test_embedder.py          # Embedder unit tests (12 tests)
@@ -405,19 +433,18 @@ procurement-agent/
 ## Running Tests
 
 Tests run entirely offline — no Docker, no Groq API, no model download needed.
-All external dependencies are mocked.
+ChromaDB runs in-memory via `EphemeralClient`; all other external dependencies are mocked.
 
 ```bash
 # Install dependencies (one-time)
 pip install -r requirements.txt
 
-# Run all unit tests (fast, fully mocked)
+# Run all unit tests (fast, fully mocked + in-memory ChromaDB)
 pytest tests/ -v \
   --ignore=tests/test_ingestion_api.py \
   --ignore=tests/test_chat_api.py
 
-# Run integration tests (requires docker compose stack running)
-docker compose up -d
+# Run integration tests (also use in-memory ChromaDB — no server needed)
 pytest tests/test_ingestion_api.py tests/test_chat_api.py -v
 
 # Run the full test suite
@@ -446,9 +473,19 @@ pytest tests/test_agents.py::TestAgentController::test_classify_mode_comparative
 
 ## Design Decisions
 
+### ChromaDB — embedded, no server
+
+ChromaDB is a pure-Python, serverless vector database. It runs inside the FastAPI
+process and persists data to a local directory (`CHROMA_PERSIST_DIR`). This means:
+- No Docker, no external service, no network config needed for local development.
+- Data survives restarts because it's written to disk.
+- For Docker deployments, the persist directory is mapped to a named volume.
+- Tests use `chromadb.EphemeralClient` — a real in-memory Chroma instance that
+  exercises the full code path without writing any files.
+
 ### Groq API via OpenAI SDK
 
-Groq exposes an OpenAI-compatible REST API. The `openai` Python SDK is used with
+The `openai` Python SDK is used with
 `base_url="https://api.groq.com/openai/v1"` and the Groq key — no custom HTTP
 client needed, and the code can switch to any OpenAI-compatible provider by
 changing two `.env` variables.
@@ -461,7 +498,7 @@ so the ~90 MB download happens only on the first `docker compose up`.
 
 ### Idempotent ingestion
 
-Each chunk's Qdrant point ID is derived from `sha256(filename + chunk_index)`.
+Each chunk's ChromaDB document ID is derived from `sha256(filename + chunk_index)`.
 Re-uploading the same file overwrites the same point IDs, preventing duplicates
 without needing a separate deduplication step.
 

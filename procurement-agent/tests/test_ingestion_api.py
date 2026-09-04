@@ -4,7 +4,7 @@ tests/test_ingestion_api.py
 Integration tests for POST /documents, DELETE /documents, GET /documents.
 
 Uses the session-scoped TestClient from conftest.py which:
-  - Replaces Qdrant with InMemoryQdrantManager
+  - Replaces ChromaDB with in-memory EphemeralClient via ChromaManager
   - Patches embed_texts to return zero-vectors (no model download)
 """
 

@@ -17,13 +17,13 @@ class DocumentUploadResponse(BaseModel):
     filename: str = Field(..., examples=["AWS_Proposal.pdf"])
     vendor_name: Optional[str] = Field(None, examples=["AWS"])
     doc_category: Optional[str] = Field(None, examples=["proposal"])
-    chunks_stored: int = Field(..., ge=0, description="Number of vector chunks committed to Qdrant")
+    chunks_stored: int = Field(..., ge=0, description="Number of vector chunks committed to ChromaDB")
     collection: str = Field(..., examples=["procurement_docs"])
 
 
 class ChunkMetadata(BaseModel):
     """
-    Metadata payload stored alongside every vector point in Qdrant.
+    Metadata payload stored alongside every vector document in ChromaDB.
     Also used internally to pass provenance between pipeline stages.
     """
 
@@ -36,7 +36,7 @@ class ChunkMetadata(BaseModel):
     chunk_index: int = Field(..., ge=0)
     total_chunks: int = Field(..., ge=1)
     token_count: int = Field(..., ge=0)
-    text: Optional[str] = None  # stored in Qdrant payload for citation display
+    text: Optional[str] = None  # stored in ChromaDB metadata for citation display
 
 
 class DeleteDocumentResponse(BaseModel):

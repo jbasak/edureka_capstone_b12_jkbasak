@@ -3,7 +3,7 @@ app/agents/retrieval.py
 
 Retrieval Agent
 ---------------
-Embeds the user question and pulls the top-K most relevant chunks from Qdrant.
+Embeds the user question and pulls the top-K most relevant chunks from ChromaDB.
 Returns a ranked list of RetrievedChunk objects with scores and full metadata.
 
 The agent is intentionally stateless: every call is independent so it can be
@@ -18,7 +18,7 @@ from typing import Optional
 
 from app.config import get_settings
 from app.ingestion.embedder import embed_query
-from app.vector_store.qdrant_client import get_qdrant_manager
+from app.vector_store.chroma_client import get_chroma_manager
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -26,7 +26,7 @@ settings = get_settings()
 
 @dataclass
 class RetrievedChunk:
-    """A single search hit returned by Qdrant with provenance metadata."""
+    """A single search hit returned by ChromaDB with provenance metadata."""
 
     text: str
     source_file: str
@@ -60,11 +60,11 @@ class RetrievedChunk:
 
 class RetrievalAgent:
     """
-    Wraps Qdrant search: embed → search → deserialise hits → rank.
+    Wraps ChromaDB search: embed → search → deserialise hits → rank.
     """
 
-    def __init__(self, qdrant_manager=None, top_k: Optional[int] = None):
-        self._qdrant = qdrant_manager or get_qdrant_manager()
+    def __init__(self, chroma_manager=None, top_k: Optional[int] = None):
+        self._qdrant = chroma_manager or get_chroma_manager()
         self._top_k = top_k or settings.top_k
 
     def retrieve(
@@ -74,7 +74,7 @@ class RetrievalAgent:
         top_k: Optional[int] = None,
     ) -> list[RetrievedChunk]:
         """
-        Embed *question* and return the top-K matching chunks from Qdrant.
+        Embed *question* and return the top-K matching chunks from ChromaDB.
 
         Parameters
         ----------

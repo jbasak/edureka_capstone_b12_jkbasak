@@ -33,7 +33,7 @@ _controller = AgentController()
     summary="Ask a procurement question",
     description=(
         "Submit a natural-language question. The multi-agent pipeline "
-        "retrieves relevant document chunks from Qdrant, reasons over them "
+        "retrieves relevant document chunks from ChromaDB, reasons over them "
         "using the Groq LLM, and validates that every claim is cited. "
         "Returns 'Information not found in context.' when evidence is absent."
     ),
@@ -53,7 +53,7 @@ def chat(request: ChatRequest) -> ChatResponse:
     try:
         response = _controller.handle(request)
     except RuntimeError as exc:
-        # LLM / Qdrant failures surfaced as 502 so the caller can distinguish
+        # LLM / ChromaDB failures surfaced as 502 so the caller can distinguish
         # application errors from 4xx validation errors
         logger.exception("Agent pipeline failed")
         raise HTTPException(

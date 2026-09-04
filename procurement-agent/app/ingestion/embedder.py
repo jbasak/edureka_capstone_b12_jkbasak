@@ -15,7 +15,7 @@ Design notes
 - Texts are encoded in batches of BATCH_SIZE (default 32) to keep GPU/CPU
   memory usage bounded when ingesting large documents.
 - Returns plain Python lists of floats (not numpy arrays) so they serialise
-  cleanly to JSON / Qdrant payloads.
+  cleanly to JSON / ChromaDB metadata payloads.
 """
 
 from __future__ import annotations

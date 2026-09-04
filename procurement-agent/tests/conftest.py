@@ -5,26 +5,30 @@ Shared pytest fixtures.
 
 Mock strategy
 -------------
-- Qdrant        : replaced with an in-memory dict store (no Docker needed)
+- ChromaDB      : real chromadb.EphemeralClient (in-memory, no files written)
+                  wrapped in a ChromaManager.  This exercises the real Chroma
+                  code paths without any disk I/O.
 - Groq / OpenAI : patched at the openai.OpenAI call site
 - HuggingFace   : embed_texts / embed_query patched to return deterministic
                   zero-vectors so tests never download the model
-- FastAPI app   : TestClient wrapping app.main:app with dependency overrides
-                  that inject the mock Qdrant manager
+- FastAPI app   : TestClient wrapping app.main:app; the chroma_client module's
+                  get_chroma_manager singleton is replaced before the client
+                  starts so every in-request call hits the in-memory store.
 """
 
 from __future__ import annotations
 
 import io
-import json
 from typing import Generator
 from unittest.mock import MagicMock, patch
 
+import chromadb
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.config import get_settings
+from app.vector_store.chroma_client import ChromaManager
 
 settings = get_settings()
 
@@ -44,109 +48,42 @@ def unit_vector(seed: int = 1) -> list[float]:
     return v
 
 
-# ── In-memory Qdrant mock ─────────────────────────────────────────────────────
+# ── In-memory ChromaDB manager ────────────────────────────────────────────────
 
-class InMemoryQdrantManager:
+def make_ephemeral_chroma_manager() -> ChromaManager:
     """
-    Drop-in replacement for QdrantManager that stores vectors in a plain dict.
-    Supports: ensure_collection, upsert_chunks, search, delete_by_source,
-              collection_info, and the _client.scroll interface used by GET /documents.
+    Return a ChromaManager backed by a real chromadb.EphemeralClient.
+    EphemeralClient stores everything in memory — no files, no server.
     """
-
-    def __init__(self):
-        self._store: dict[int, dict] = {}  # point_id → {vector, payload}
-        self._client = _ScrollAdapter(self._store)
-
-    def ensure_collection(self):
-        pass
-
-    def collection_info(self):
-        info = MagicMock()
-        info.vectors_count = len(self._store)
-        return info
-
-    def upsert_chunks(self, chunks, vectors):
-        import hashlib
-
-        for chunk, vec in zip(chunks, vectors):
-            digest = hashlib.sha256(
-                f"{chunk.source_file}::{chunk.chunk_index}".encode()
-            ).digest()
-            pid = int.from_bytes(digest[:8], "big") & 0x7FFF_FFFF_FFFF_FFFF
-            self._store[pid] = {
-                "vector": vec,
-                "payload": {
-                    "source_file": chunk.source_file,
-                    "vendor_name": chunk.vendor_name,
-                    "doc_category": chunk.doc_category,
-                    "page_number": chunk.page_number,
-                    "row_index": chunk.row_index,
-                    "sheet_name": chunk.sheet_name,
-                    "chunk_index": chunk.chunk_index,
-                    "total_chunks": chunk.total_chunks,
-                    "token_count": chunk.token_count,
-                    "text": chunk.text,
-                },
-            }
-        return len(chunks)
-
-    def search(self, query_vector, top_k=6, vendor_filter=None):
-        results = []
-        for pid, entry in self._store.items():
-            payload = entry["payload"]
-            if vendor_filter and payload.get("vendor_name") not in vendor_filter:
-                continue
-            results.append({"score": 0.85, **payload})
-        return results[:top_k]
-
-    def delete_by_source(self, source_file: str):
-        to_delete = [
-            pid for pid, entry in self._store.items()
-            if entry["payload"].get("source_file") == source_file
-        ]
-        for pid in to_delete:
-            del self._store[pid]
-        return len(to_delete)
-
-
-class _ScrollAdapter:
-    """Minimal mock of qdrant_client.QdrantClient.scroll() for GET /documents."""
-
-    def __init__(self, store: dict):
-        self._store = store
-
-    def scroll(self, collection_name, limit=256, offset=None,
-               with_payload=None, with_vectors=False):
-        points = []
-        for pid, entry in self._store.items():
-            pt = MagicMock()
-            pt.payload = entry["payload"]
-            points.append(pt)
-        # Return all at once (no pagination needed for tests)
-        return points, None
+    ephemeral_client = chromadb.EphemeralClient(
+        settings=chromadb.config.Settings(anonymized_telemetry=False)
+    )
+    manager = ChromaManager(client=ephemeral_client)
+    manager.ensure_collection()
+    return manager
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="session")
-def mock_qdrant() -> InMemoryQdrantManager:
-    """Session-scoped in-memory Qdrant manager shared across all tests."""
-    return InMemoryQdrantManager()
+def mock_chroma() -> ChromaManager:
+    """Session-scoped in-memory ChromaDB manager shared across all tests."""
+    return make_ephemeral_chroma_manager()
 
 
 @pytest.fixture(scope="session")
-def client(mock_qdrant) -> Generator[TestClient, None, None]:
+def client(mock_chroma) -> Generator[TestClient, None, None]:
     """
     FastAPI TestClient with:
-      - Qdrant replaced by InMemoryQdrantManager
+      - ChromaDB replaced by in-memory EphemeralClient via ChromaManager
       - embed_texts / embed_query patched to return zero-vectors
       - openai.OpenAI patched to return a canned LLM response
     """
-    from app.vector_store import qdrant_client as qc_module
+    from app.vector_store import chroma_client as cc_module
 
-    # Override the cached singleton so the API uses our in-memory store
-    qc_module.get_qdrant_manager.cache_clear()
-    qc_module.get_qdrant_manager = lambda: mock_qdrant  # type: ignore[assignment]
+    # Replace the cached singleton so every API call hits in-memory Chroma
+    cc_module.get_chroma_manager.cache_clear()
+    cc_module.get_chroma_manager = lambda: mock_chroma  # type: ignore[assignment]
 
     with (
         patch("app.ingestion.embedder.embed_texts",
@@ -161,10 +98,11 @@ def client(mock_qdrant) -> Generator[TestClient, None, None]:
             yield c
 
 
+# ── Sample document byte fixtures ─────────────────────────────────────────────
+
 @pytest.fixture(scope="session")
 def sample_pdf_bytes() -> bytes:
     """Minimal valid single-page PDF bytes (no external file needed)."""
-    # Manually constructed minimal PDF
     return (
         b"%PDF-1.4\n"
         b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
@@ -237,7 +175,5 @@ def _mock_openai_client():
         "Oracle provides database services at $520,000 annually "
         "[Schedule B Pricing-Oracle.pdf, Page 5]."
     )
-    client.chat.completions.create.return_value = MagicMock(
-        choices=[choice]
-    )
+    client.chat.completions.create.return_value = MagicMock(choices=[choice])
     return client

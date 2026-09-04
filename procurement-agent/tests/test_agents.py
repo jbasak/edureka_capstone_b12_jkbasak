@@ -8,7 +8,7 @@ Unit tests for all five agents:
   - RequirementExtractionAgent
   - AgentController (mode detection + pipeline integration)
 
-All external I/O (Qdrant, Groq) is mocked.
+All external I/O (ChromaDB, Groq) is mocked.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def _make_chunk(
 
 
 def _mock_qdrant(hits=None):
-    """Return a mock QdrantManager whose search() returns *hits*."""
+    """Return a mock ChromaManager whose search() returns *hits*."""
     if hits is None:
         hits = [
             {
@@ -86,7 +86,7 @@ def _mock_llm_client(content: str):
 
 class TestRetrievalAgent:
     def test_returns_list_of_retrieved_chunks(self):
-        agent = RetrievalAgent(qdrant_manager=_mock_qdrant())
+        agent = RetrievalAgent(chroma_manager=_mock_qdrant())
         with patch("app.agents.retrieval.embed_query", return_value=_zero_vec()):
             results = agent.retrieve("What is the uptime SLA?")
         assert isinstance(results, list)
@@ -94,7 +94,7 @@ class TestRetrievalAgent:
         assert isinstance(results[0], RetrievedChunk)
 
     def test_chunk_fields_populated(self):
-        agent = RetrievalAgent(qdrant_manager=_mock_qdrant())
+        agent = RetrievalAgent(chroma_manager=_mock_qdrant())
         with patch("app.agents.retrieval.embed_query", return_value=_zero_vec()):
             results = agent.retrieve("uptime")
         chunk = results[0]
@@ -104,14 +104,14 @@ class TestRetrievalAgent:
         assert chunk.page_number == 3
 
     def test_empty_db_returns_empty_list(self):
-        agent = RetrievalAgent(qdrant_manager=_mock_qdrant(hits=[]))
+        agent = RetrievalAgent(chroma_manager=_mock_qdrant(hits=[]))
         with patch("app.agents.retrieval.embed_query", return_value=_zero_vec()):
             results = agent.retrieve("anything")
         assert results == []
 
-    def test_vendor_filter_passed_to_qdrant(self):
+    def test_vendor_filter_passed_to_chroma(self):
         mgr = _mock_qdrant()
-        agent = RetrievalAgent(qdrant_manager=mgr)
+        agent = RetrievalAgent(chroma_manager=mgr)
         with patch("app.agents.retrieval.embed_query", return_value=_zero_vec()):
             agent.retrieve("pricing", vendor_filter=["AWS"])
         mgr.search.assert_called_once()

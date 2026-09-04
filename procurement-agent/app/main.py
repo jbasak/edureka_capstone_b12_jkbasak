@@ -2,7 +2,7 @@
 app/main.py
 FastAPI application entry point.
 Registers routers for /documents, /chat, and /health.
-Initialises the Qdrant collection on startup.
+Initialises the ChromaDB collection on startup.
 """
 
 import logging
@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.api import documents, chat
-from app.vector_store.qdrant_client import get_qdrant_manager
+from app.vector_store.chroma_client import get_chroma_manager
 
 settings = get_settings()
 
@@ -30,13 +30,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Initialise resources on startup; clean up on shutdown."""
     logger.info("Starting Procurement Agent API …")
-    qdrant_mgr = get_qdrant_manager()
-    qdrant_mgr.ensure_collection()
+    chroma_mgr = get_chroma_manager()
+    chroma_mgr.ensure_collection()
     logger.info(
-        "Qdrant collection '%s' ready at %s:%d",
-        settings.qdrant_collection,
-        settings.qdrant_host,
-        settings.qdrant_port,
+        "ChromaDB collection '%s' ready (persist_dir='%s')",
+        settings.chroma_collection,
+        settings.chroma_persist_dir,
     )
     yield
     logger.info("Shutting down Procurement Agent API.")
@@ -72,22 +71,25 @@ app.include_router(chat.router, prefix="/chat", tags=["Query"])
 @app.get("/health", tags=["Health"])
 def health_check():
     """
-    Returns service health, Qdrant connectivity, and current collection stats.
+    Returns service health and current ChromaDB collection stats.
+    No external service call needed — ChromaDB is in-process.
     """
-    qdrant_mgr = get_qdrant_manager()
+    chroma_mgr = get_chroma_manager()
     try:
-        info = qdrant_mgr.collection_info()
-        qdrant_status = "connected"
-        vector_count = info.vectors_count if info else 0
+        info = chroma_mgr.collection_info()
+        db_status = "connected"
+        vector_count = info.get("vectors_count", 0)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Qdrant health check failed: %s", exc)
-        qdrant_status = "unavailable"
+        logger.warning("ChromaDB health check failed: %s", exc)
+        db_status = "unavailable"
         vector_count = None
 
     return {
         "status": "healthy",
-        "qdrant": qdrant_status,
-        "collection": settings.qdrant_collection,
+        "vector_db": db_status,
+        "vector_db_type": "chromadb",
+        "collection": settings.chroma_collection,
+        "persist_dir": settings.chroma_persist_dir,
         "vector_count": vector_count,
         "embedding_model": settings.embedding_model,
         "llm_model": settings.groq_model,

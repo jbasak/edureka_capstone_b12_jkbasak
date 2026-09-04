@@ -1,0 +1,1 @@
+"""Procurement assistant application package."""

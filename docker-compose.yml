@@ -1,0 +1,39 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    environment:
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      chromadb:
+        condition: service_healthy
+
+  ui:
+    build: .
+    env_file: .env
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    command: ["streamlit", "run", "src/ui/app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+    depends_on:
+      api:
+        condition: service_started
+
+  chromadb:
+    image: chromadb/chroma:0.6.3
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  chroma_data:

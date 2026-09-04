@@ -94,6 +94,32 @@ pdm.toml
 .pixi
 __pypackages__/
 
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# Python tooling and local caches
+.pyright/
+
+# Application data and local model stores
+chroma_data/
+models/
+*.sqlite3
+*.sqlite3-journal
+
+# Logs and temporary files
+*.tmp
+*.bak
+*.swp
+temp/
+tmp/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid

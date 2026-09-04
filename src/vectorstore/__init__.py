@@ -1,0 +1,1 @@
+"""ChromaDB client and embedding integration."""

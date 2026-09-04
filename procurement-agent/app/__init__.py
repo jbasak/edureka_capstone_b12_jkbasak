@@ -1,1 +1,0 @@
-# Procurement & Vendor Evaluation Assistant

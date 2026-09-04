@@ -170,3 +170,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+#Chromadb
+chroma_db
+chroma_db/*/*

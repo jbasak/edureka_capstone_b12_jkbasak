@@ -1,3 +1,8 @@
+#Run following command before running the scripts
+# This will Change PowerShell Execution Policy
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+
 # --- CONFIGURATION ---
 $envPath    = ".\pythonenv"
 $reqFile    = "requirements.txt"

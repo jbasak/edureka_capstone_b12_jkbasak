@@ -11,7 +11,7 @@ load_dotenv()
 
 class Settings(BaseModel):
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
-    groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
+    groq_model: str = Field(default="openai/gpt-oss-20b", alias="GROQ_MODEL")
     chromadb_host: str = Field(default="localhost", alias="CHROMADB_HOST")
     chromadb_port: int = Field(default=8000, alias="CHROMADB_PORT")
     embedding_model_name: str = Field(

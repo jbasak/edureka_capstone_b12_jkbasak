@@ -40,6 +40,7 @@ The application can run locally with Python 3.12, a local ChromaDB server, and t
 3. Start ChromaDB in terminal 1. The `--path` directory stores vectors locally and is created automatically:
 
 	```powershell
+	cd  C:\BASAK\Codebase\github_repos\edureka_capstone_b12_jkbasak
 	.\.venv\Scripts\Activate.ps1
 	chroma run --path .\chroma_data --host localhost --port 8001
 	```
@@ -47,6 +48,7 @@ The application can run locally with Python 3.12, a local ChromaDB server, and t
 4. Start the FastAPI backend in terminal 2:
 
 	```powershell
+	cd  C:\BASAK\Codebase\github_repos\edureka_capstone_b12_jkbasak
 	.\.venv\Scripts\Activate.ps1
 	uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000
 	```
@@ -54,6 +56,7 @@ The application can run locally with Python 3.12, a local ChromaDB server, and t
 5. Start the Streamlit UI in terminal 3:
 
 	```powershell
+	cd  C:\BASAK\Codebase\github_repos\edureka_capstone_b12_jkbasak
 	.\.venv\Scripts\Activate.ps1
 	streamlit run src/ui/app.py --server.port 8501
 	```
@@ -81,4 +84,4 @@ The UI is available at `http://localhost:8501`, the API at `http://localhost:800
 
 ## Tests and limitations
 
-Run `pytest`. Retrieval and generation tests should mock ChromaDB and Groq; neither a live vector service nor an API key is required for unit tests. The chunker uses whitespace words as a lightweight token approximation, and generated answers remain decision support rather than legal or contractual advice.
+Run `pytest`. Retrieval and generation tests should mock ChromaDB and Groq; neither a live vector service nor an API key is required for unit tests. The chunker uses whitespace words as a lightweight token approximation, and generated answers remain decision support rather than legal or contractual advice

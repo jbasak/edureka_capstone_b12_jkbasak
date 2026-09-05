@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -9,6 +10,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Procurement intelligence", page_icon=":material/search:", layout="wide")
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+COMPANY_LOGO_PATH = Path(os.getenv("COMPANY_LOGO_PATH", "assets/company-logo.png"))
 
 
 def api_request(path: str, method: str = "GET", payload: bytes | None = None, content_type: str | None = None) -> dict:
@@ -40,6 +42,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 with st.sidebar:
+    if COMPANY_LOGO_PATH.is_file():
+        st.image(str(COMPANY_LOGO_PATH), width=180)
     st.header("Knowledge base")
     st.caption("Upload procurement evidence before asking a question.")
     uploads = st.file_uploader("Documents", type=["pdf", "txt", "csv", "xlsx"], accept_multiple_files=True)
@@ -55,7 +59,14 @@ with st.sidebar:
                     st.error(f"Upload failed: {exc}")
     st.caption(f"Backend: {API_BASE_URL}")
 
-st.title("Procurement intelligence")
+if COMPANY_LOGO_PATH.is_file():
+    logo_column, title_column = st.columns([1, 8], vertical_alignment="center")
+    with logo_column:
+        st.image(str(COMPANY_LOGO_PATH), width=72)
+    with title_column:
+        st.title("Procurement intelligence")
+else:
+    st.title("Procurement intelligence")
 st.write("Ask grounded questions across RFP responses, pricing sheets, and compliance evidence.")
 
 for message in st.session_state.messages:

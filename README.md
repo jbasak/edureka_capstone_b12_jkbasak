@@ -65,10 +65,12 @@ Open the UI at `http://localhost:8501`. The API health check is available at `ht
 
 The first document upload downloads the `sentence-transformers/all-MiniLM-L6-v2` model, so embedding initialization may take a few minutes. Keep the ChromaDB, FastAPI, and Streamlit terminals running while using the application.
 
-Full Docker deployment:
+To add the company logo, place a PNG, JPG, or WebP image at `assets/company-logo.png`. The Streamlit sidebar displays it automatically. To use another file, set `COMPANY_LOGO_PATH` in `.env` to its path before starting Streamlit.
+
+6. Full Docker deployment:
 
 ```powershell
-Copy-Item .env.example .env
+Copy-Item example_env .env
 # Set GROQ_API_KEY in .env
 docker compose up --build
 ```
